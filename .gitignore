@@ -1,0 +1,25 @@
+# Secrets
+*.ini
+*.env
+.env
+credentials/
+secrets/
+
+# Private keys and certificate material
+*.key
+*.pem
+*.p12
+*.pfx
+
+# ACME / Let's Encrypt runtime state
+letsencrypt/
+acme-state/
+
+# Local overrides
+*.local
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
