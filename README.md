@@ -16,9 +16,38 @@ The project is designed for LAN-only services. No inbound Internet access or rou
 - Use ACME DNS-01 validation through Cloudflare DNS.
 - Run Certbot from Docker rather than installing it directly on the host.
 - Persist certificate state outside the Certbot container.
-- Automate certificate renewal.
+- Automate certificate renewal with `systemd`.
 - Keep private services accessible only from the LAN.
 - Support both Ubuntu and Windows on the physical host `atreides`, developed in separate phases.
+- Keep Cloudflare credentials, private keys, issued certificates, and Certbot state outside Git.
+
+## Current Validated Baseline
+
+The Ubuntu workflow for `atreides.lan.rirl.dev` has been proven manually and through the repository automation.
+
+Validated state:
+
+- Cloudflare is authoritative for `rirl.dev`.
+- DNSSEC is enabled and validated.
+- The scoped Cloudflare API token has been validated.
+- Let's Encrypt staging issuance succeeded.
+- Let's Encrypt production issuance succeeded.
+- The production certificate for `atreides.lan.rirl.dev` was issued successfully.
+- ACME DNS TXT cleanup was verified.
+- `certbot renew --dry-run` succeeded.
+- The repository renewal wrapper succeeded.
+- `git diff --check` passed.
+- ShellCheck passed for the renewal script.
+- Manual execution through the `systemd` service succeeded.
+- `systemd-analyze --user verify` passed for the service and timer.
+- User lingering is enabled.
+- The renewal timer is enabled and active.
+
+Current Certbot image:
+
+```text
+certbot/dns-cloudflare:v5.7.0
+```
 
 ## Initial Target
 
@@ -30,55 +59,13 @@ mDNS name:       atreides.local
 TLS name:        atreides.lan.rirl.dev
 ```
 
-The initial certificate is:
+The initial production certificate is:
 
 ```text
 atreides.lan.rirl.dev
 ```
 
-After the basic workflow is proven, an optional wildcard certificate may be introduced:
-
-```text
-*.atreides.lan.rirl.dev
-```
-
-This can support service names such as:
-
-```text
-openwebui.atreides.lan.rirl.dev
-ollama.atreides.lan.rirl.dev
-mcp.atreides.lan.rirl.dev
-```
-
-## Architecture
-
-```text
-Squarespace
-  registrar / parent DNS for rirl.dev
-        |
-        | delegates lan.rirl.dev
-        v
-Cloudflare DNS
-  authoritative for lan.rirl.dev
-        |
-        | ACME DNS-01 TXT records
-        v
-Let's Encrypt
-        |
-        | certificate issuance
-        v
-Dockerized Certbot
-  certbot/dns-cloudflare
-        |
-        v
-Persistent certificate state
-  /opt/acme
-        |
-        v
-LAN-only services
-```
-
-The DNS name used for TLS does not replace the host's `.local` identity.
+The existing `.local` identity remains unchanged.
 
 For example:
 
@@ -86,11 +73,40 @@ For example:
 ssh atreides.local
 ```
 
-can continue to be used while HTTPS tooling uses:
+can continue to be used while HTTPS services use:
 
 ```text
 https://atreides.lan.rirl.dev
 ```
+
+## Architecture
+
+```text
+Cloudflare DNS
+  authoritative for rirl.dev
+        |
+        | ACME DNS-01 TXT records
+        v
+Let's Encrypt
+        |
+        | certificate issuance / renewal
+        v
+Dockerized Certbot
+  certbot/dns-cloudflare:v5.7.0
+        |
+        +--> Cloudflare credential
+        |    ~/.config/rirl-lan-tls/certbot/cloudflare.ini
+        |
+        +--> Persistent Certbot state
+             ~/.local/share/rirl-lan-tls/letsencrypt
+        |
+        v
+LAN-only services
+```
+
+The Certbot container is disposable.
+
+The Cloudflare credential and Certbot state persist on the host outside Git.
 
 ## Security Model
 
@@ -107,119 +123,293 @@ Internet port forward: No
 Public web service:    No
 ```
 
-Cloudflare API access should use a restricted API token with DNS edit permission only for the relevant zone.
+Cloudflare API access uses a scoped API token.
 
-Credentials and private keys must never be committed to Git.
+The populated credential file must never be committed to Git.
 
-## Current Implementation Phase
-
-### Phase 1 — Ubuntu
-
-The Ubuntu phase establishes and verifies the complete certificate lifecycle:
-
-1. Delegate `lan.rirl.dev` to Cloudflare.
-2. Verify authoritative DNS delegation.
-3. Create a restricted Cloudflare API token.
-4. Create persistent Certbot storage.
-5. Run the current stable `certbot/dns-cloudflare` image in Docker.
-6. Obtain a Let's Encrypt staging certificate.
-7. Verify renewal with `certbot renew --dry-run`.
-8. Obtain the production certificate.
-9. Inspect the certificate with OpenSSL.
-10. Automate renewal with systemd.
-11. Resolve `atreides.lan.rirl.dev` on the LAN.
-12. Validate the certificate with a local HTTPS service.
-
-The Ubuntu implementation is documented in:
+The credential file is stored at:
 
 ```text
-docs/lets-encrypt-lan-rirl-dev-ubuntu-first.md
+~/.config/rirl-lan-tls/certbot/cloudflare.ini
 ```
 
-### Phase 2 — Windows
+and must have mode:
 
-The Windows implementation is intentionally deferred until the Ubuntu workflow is proven.
+```text
+0600
+```
 
-The Windows phase will address:
+Persistent Certbot state is stored at:
 
-- Windows certificate storage
-- Docker Desktop or another suitable ACME runtime
-- secure Cloudflare credential storage
-- scheduled certificate renewal
-- service-specific certificate deployment
-- private-key separation between Ubuntu and Windows
-- naming policy for a dual-boot physical host
+```text
+~/.local/share/rirl-lan-tls/letsencrypt
+```
 
-No Windows certificate architecture should be considered final until the Ubuntu implementation is complete.
+That state includes ACME account information, renewal configuration, private keys, and issued certificates and must remain outside Git.
 
-## Proposed Repository Layout
+## Proven Manual Workflow
+
+The production issuance workflow used:
+
+```bash
+docker run --rm \
+  -v ~/.config/rirl-lan-tls/certbot/cloudflare.ini:/cloudflare.ini:ro \
+  -v ~/.local/share/rirl-lan-tls/letsencrypt:/etc/letsencrypt \
+  certbot/dns-cloudflare:v5.7.0 \
+  certonly \
+  --dns-cloudflare \
+  --dns-cloudflare-credentials /cloudflare.ini \
+  --dns-cloudflare-propagation-seconds 30 \
+  --agree-tos \
+  --non-interactive \
+  --register-unsafely-without-email \
+  -d atreides.lan.rirl.dev
+```
+
+The proven renewal dry-run used:
+
+```bash
+docker run --rm \
+  -v ~/.config/rirl-lan-tls/certbot/cloudflare.ini:/cloudflare.ini:ro \
+  -v ~/.local/share/rirl-lan-tls/letsencrypt:/etc/letsencrypt \
+  certbot/dns-cloudflare:v5.7.0 \
+  renew \
+  --dry-run
+```
+
+The repository automation is intentionally based on this proven runtime model.
+
+## Repository Layout
 
 ```text
 rirl-lan-tls/
 ├── README.md
+├── config/
+│   ├── cloudflare.ini.example
+│   └── renew.conf.example
 ├── docs/
-│   └── lets-encrypt-lan-rirl-dev-ubuntu-first.md
-├── docker/
+│   └── renewal-automation.md
 ├── scripts/
+│   └── renew-certificates.bash
 ├── systemd/
-├── windows/
+│   └── user/
+│       ├── rirl-lan-tls-renew.service
+│       └── rirl-lan-tls-renew.timer
 └── .gitignore
 ```
 
-The directories can be populated incrementally as the manual procedure is converted into automation.
+Additional historical or operational artifacts may also exist in the repository.
 
-## Persistent Ubuntu State
+## Repository Boundary
 
-The intended host-side Certbot layout is:
+The repository contains:
+
+- automation scripts,
+- non-secret configuration templates,
+- `systemd` unit definitions,
+- operational documentation,
+- repository-safe evidence and records.
+
+The repository must not contain:
+
+- Cloudflare API tokens,
+- populated credential files,
+- `.env` files containing secrets,
+- private keys,
+- PEM certificate material,
+- PKCS#12 files,
+- Certbot ACME account state,
+- generated renewal state.
+
+## External Runtime State
+
+Cloudflare credential:
 
 ```text
-/opt/acme/
-├── credentials/
-│   └── cloudflare.ini
-├── etc/
-├── lib/
-└── log/
+~/.config/rirl-lan-tls/certbot/cloudflare.ini
 ```
 
-Container mappings:
+Local renewal configuration:
 
 ```text
-/opt/acme/etc  -> /etc/letsencrypt
-/opt/acme/lib  -> /var/lib/letsencrypt
-/opt/acme/log  -> /var/log/letsencrypt
+~/.config/rirl-lan-tls/renew.conf
 ```
 
-The Certbot container is disposable. Certificate and ACME account state remain on the host.
+Persistent Certbot state:
 
-## Git Safety
-
-At minimum, the repository should exclude secrets and generated certificate material.
-
-Suggested `.gitignore` entries:
-
-```gitignore
-# Secrets
-*.ini
-*.env
-.env
-credentials/
-secrets/
-
-# Private keys and certificate material
-*.key
-*.pem
-*.p12
-*.pfx
-
-# ACME runtime state
-letsencrypt/
-acme-state/
-
-# Local overrides
-*.local
+```text
+~/.local/share/rirl-lan-tls/letsencrypt
 ```
 
-Do not place the Cloudflare API token in this repository, even in a private GitHub repository.
+Repository:
+
+```text
+~/projects/rirl-lan-tls
+```
+
+## Renewal Automation
+
+The repository renewal wrapper is:
+
+```text
+scripts/renew-certificates.bash
+```
+
+Manual dry-run validation:
+
+```bash
+cd ~/projects/rirl-lan-tls
+
+./scripts/renew-certificates.bash --dry-run
+```
+
+Manual ordinary renewal invocation:
+
+```bash
+./scripts/renew-certificates.bash
+```
+
+A successful ordinary invocation may report:
+
+```text
+Certificate not yet due for renewal
+No renewals were attempted.
+```
+
+That is expected when the certificate is not yet within its renewal window.
+
+The wrapper also verifies:
+
+- the required commands are available,
+- the Cloudflare credential file exists,
+- the credential file has mode `0600`,
+- the persistent Certbot state directory exists,
+- Docker is available to the current user,
+- the pinned Certbot image already exists locally.
+
+Automated renewal uses:
+
+```text
+--pull=never
+```
+
+so an unattended timer run cannot silently upgrade the Certbot image.
+
+Image upgrades are intended to be deliberate, validated, and committed separately.
+
+## systemd Automation
+
+Renewal is driven by a user-level `systemd` oneshot service and timer.
+
+Tracked unit files:
+
+```text
+systemd/user/rirl-lan-tls-renew.service
+systemd/user/rirl-lan-tls-renew.timer
+```
+
+Installed user-unit links:
+
+```text
+~/.config/systemd/user/rirl-lan-tls-renew.service
+~/.config/systemd/user/rirl-lan-tls-renew.timer
+```
+
+The renewal timer evaluates twice daily:
+
+```text
+00:00
+12:00
+```
+
+with:
+
+```text
+RandomizedDelaySec=30m
+Persistent=true
+```
+
+Certbot itself decides whether a certificate is actually due for renewal.
+
+## User Lingering
+
+User lingering is enabled so the user systemd manager can execute the renewal timer without requiring an active interactive login.
+
+Verify:
+
+```bash
+loginctl show-user "$USER" -p Linger
+```
+
+Expected:
+
+```text
+Linger=yes
+```
+
+## Timer Status
+
+Check timer status:
+
+```bash
+systemctl --user status rirl-lan-tls-renew.timer
+```
+
+Show the next scheduled run:
+
+```bash
+systemctl --user list-timers rirl-lan-tls-renew.timer
+```
+
+The expected timer state is:
+
+```text
+active (waiting)
+```
+
+## Renewal Logs
+
+Review all renewal-service logs:
+
+```bash
+journalctl --user \
+  -u rirl-lan-tls-renew.service
+```
+
+Review logs from the current boot:
+
+```bash
+journalctl --user \
+  -b \
+  -u rirl-lan-tls-renew.service
+```
+
+## Disable Automation
+
+Disable the timer without removing certificates, credentials, or Certbot state:
+
+```bash
+systemctl --user disable --now rirl-lan-tls-renew.timer
+```
+
+The external runtime state remains untouched.
+
+## Validation Record
+
+The current Ubuntu renewal automation has passed the following checks:
+
+```text
+Manual Certbot staging issuance        PASS
+Manual Certbot production issuance     PASS
+Manual Certbot renewal dry-run         PASS
+Repository wrapper dry-run             PASS
+git diff --check                       PASS
+ShellCheck                             PASS
+Manual systemd service execution       PASS
+systemd unit verification              PASS
+User lingering                         ENABLED
+Renewal timer                          ENABLED / ACTIVE
+```
 
 ## Certificate Naming Strategy
 
@@ -229,50 +419,64 @@ The current namespace boundary is:
 lan.rirl.dev
 ```
 
-Initial host certificate:
+Current host certificate:
 
 ```text
 atreides.lan.rirl.dev
 ```
 
-Possible later host wildcard:
+Possible future service names include:
+
+```text
+openwebui.atreides.lan.rirl.dev
+ollama.atreides.lan.rirl.dev
+mcp.atreides.lan.rirl.dev
+```
+
+A wildcard certificate such as:
 
 ```text
 *.atreides.lan.rirl.dev
 ```
 
-A wildcard should be introduced only after the single-host certificate lifecycle is working reliably.
+may be considered later, but it is not required for the current validated baseline.
 
-## Completion Criteria for Ubuntu
+## Ubuntu Status
 
-The Ubuntu phase is complete only when:
+The certificate issuance and renewal path for Ubuntu on `atreides` is operational.
 
-- `lan.rirl.dev` is authoritatively served by Cloudflare.
-- Dockerized Certbot can create and remove DNS-01 challenge records.
-- staging issuance succeeds.
-- renewal dry-run succeeds.
-- production issuance succeeds.
-- the certificate contains the expected SAN.
-- the renewal timer is enabled and tested.
-- LAN clients resolve `atreides.lan.rirl.dev`.
-- a local HTTPS service presents the certificate successfully.
+Remaining work is service-specific integration, such as configuring individual LAN services to present the issued certificate and validating HTTPS from LAN clients.
 
-Only then should the project proceed to the Windows phase.
+## Windows Phase
+
+The Windows implementation remains intentionally separate.
+
+Future Windows work may address:
+
+- Windows certificate storage,
+- Docker Desktop or another suitable ACME runtime,
+- secure Cloudflare credential storage,
+- scheduled certificate renewal,
+- service-specific certificate deployment,
+- private-key separation between Ubuntu and Windows,
+- naming policy for the dual-boot physical host.
+
+The proven Ubuntu implementation should remain the reference baseline while the Windows design is developed.
 
 ## Documentation
 
-Start here:
+Detailed renewal automation procedures are documented in:
 
 ```text
-docs/lets-encrypt-lan-rirl-dev-ubuntu-first.md
+docs/renewal-automation.md
 ```
-
-That document contains the checkpoint-driven Ubuntu procedure from DNS delegation through automated certificate renewal and local HTTPS validation.
 
 ## Status
 
 ```text
-Ubuntu certificate automation: Planned / implementation in progress
-Windows certificate automation: Deferred
-External service exposure:      Out of scope
+Ubuntu certificate issuance:   VALIDATED
+Ubuntu renewal automation:      OPERATIONAL
+systemd renewal timer:          ENABLED
+Windows certificate automation: DEFERRED
+External service exposure:      OUT OF SCOPE
 ```

@@ -1,0 +1,11 @@
+# Copy this file OUTSIDE the repository to:
+#
+#   ~/.config/rirl-lan-tls/renew.conf
+#
+# This file contains operational configuration, not credentials.
+
+CERTBOT_IMAGE='certbot/dns-cloudflare:v5.7.0'
+
+CLOUDFLARE_CREDENTIALS="${HOME}/.config/rirl-lan-tls/certbot/cloudflare.ini"
+
+LETSENCRYPT_DIR="${HOME}/.local/share/rirl-lan-tls/letsencrypt"
