@@ -1,0 +1,10 @@
+Captured: 2026-08-30T16:33:44-07:00
+
+serial=0668203FC3D39CF80A3A52E1AEBBC0F38DC1
+sha256 Fingerprint=B6:05:E4:05:1F:35:96:46:46:1C:CB:1B:30:E9:67:7E:BC:A4:72:8B:82:71:E8:90:A7:D1:D6:56:85:0F:01:D8
+notBefore=Aug 30 22:09:04 2026 GMT
+notAfter=Nov 28 22:09:03 2026 GMT
+issuer=C = US, O = Let's Encrypt, CN = YE1
+
+Archive target:
+/home/landonr/.local/share/rirl-lan-tls/letsencrypt/archive/atreides.lan.rirl.dev/cert2.pem

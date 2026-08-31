@@ -18,22 +18,27 @@ fi
 
 usage() {
     cat <<USAGE
-Usage: ${PROGRAM_NAME} [--dry-run]
+Usage: ${PROGRAM_NAME} [--dry-run | --force-renewal]
 
 Renew certificates using the repository-approved Certbot Docker image.
 
 Options:
-  --dry-run    Perform a Certbot renewal dry run.
-  -h, --help   Show this help.
+  --dry-run        Perform a Certbot renewal dry run.
+  --force-renewal  Force a real production renewal even if not yet due.
+  -h, --help       Show this help.
 USAGE
 }
 
 dry_run=false
+force_renewal=false
 
 while (($# > 0)); do
     case "$1" in
         --dry-run)
             dry_run=true
+            ;;
+        --force-renewal)
+            force_renewal=true
             ;;
         -h | --help)
             usage
@@ -48,6 +53,11 @@ while (($# > 0)); do
 
     shift
 done
+
+if [[ "${dry_run}" == true && "${force_renewal}" == true ]]; then
+    printf 'ERROR: --dry-run and --force-renewal are mutually exclusive.\n' >&2
+    exit 2
+fi
 
 for command in docker stat; do
     if ! command -v "${command}" >/dev/null 2>&1; then
@@ -96,6 +106,9 @@ certbot_arguments=(
 
 if [[ "${dry_run}" == true ]]; then
     certbot_arguments+=(--dry-run)
+fi
+if [[ "${force_renewal}" == true ]]; then
+    certbot_arguments+=(--force-renewal)
 fi
 
 printf '[%s] Starting Certbot renewal using %s\n' \
