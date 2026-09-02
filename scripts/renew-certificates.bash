@@ -11,6 +11,8 @@ CERTBOT_IMAGE='certbot/dns-cloudflare:v5.7.0'
 CLOUDFLARE_CREDENTIALS="${HOME}/.config/rirl-lan-tls/certbot/cloudflare.ini"
 LETSENCRYPT_DIR="${HOME}/.local/share/rirl-lan-tls/letsencrypt"
 
+RECONCILE_COMMAND=''
+
 if [[ -f "${CONFIG_FILE}" ]]; then
     # shellcheck source=/dev/null
     source "${CONFIG_FILE}"
@@ -111,6 +113,17 @@ if [[ "${force_renewal}" == true ]]; then
     certbot_arguments+=(--force-renewal)
 fi
 
+if [[ -z "${RECONCILE_COMMAND}" ]]; then
+    printf 'ERROR: RECONCILE_COMMAND is not configured.\n' >&2
+    exit 1
+fi
+
+if [[ ! -x "${RECONCILE_COMMAND}" ]]; then
+    printf 'ERROR: RECONCILE_COMMAND is not executable: %s\n' \
+        "${RECONCILE_COMMAND}" >&2
+    exit 1
+fi
+
 printf '[%s] Starting Certbot renewal using %s\n' \
     "$(date --iso-8601=seconds)" \
     "${CERTBOT_IMAGE}"
@@ -126,4 +139,16 @@ docker run \
     "${certbot_arguments[@]}"
 
 printf '[%s] Certbot renewal completed successfully.\n' \
+    "$(date --iso-8601=seconds)"
+
+printf '[%s] Starting consumer reconciliation.\n' \
+    "$(date --iso-8601=seconds)"
+
+if ! "${RECONCILE_COMMAND}"; then
+    printf '[%s] ERROR: consumer reconciliation failed.\n' \
+        "$(date --iso-8601=seconds)" >&2
+    exit 1
+fi
+
+printf '[%s] Consumer reconciliation completed successfully.\n' \
     "$(date --iso-8601=seconds)"

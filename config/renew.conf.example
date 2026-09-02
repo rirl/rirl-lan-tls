@@ -9,3 +9,7 @@ CERTBOT_IMAGE='certbot/dns-cloudflare:v5.7.0'
 CLOUDFLARE_CREDENTIALS="${HOME}/.config/rirl-lan-tls/certbot/cloudflare.ini"
 
 LETSENCRYPT_DIR="${HOME}/.local/share/rirl-lan-tls/letsencrypt"
+
+# Required consumer convergence interface.
+# Exit 0 = consumer is proven converged; nonzero = convergence not established.
+RECONCILE_COMMAND="${HOME}/projects/rirl-tls-nginx-validation/scripts/reconcile.bash"

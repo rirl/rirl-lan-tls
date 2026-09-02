@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -eu
+
+if [ "${1:-}" = "--iso-8601=seconds" ]; then
+    printf '%s\n' '2026-09-02T10:00:00-07:00'
+    exit 0
+fi
+
+exec /bin/date "$@"
