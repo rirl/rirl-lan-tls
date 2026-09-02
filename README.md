@@ -17,6 +17,8 @@ The project is designed for LAN-only services. No inbound Internet access or rou
 - Run Certbot from Docker rather than installing it directly on the host.
 - Persist certificate state outside the Certbot container.
 - Automate certificate renewal with `systemd`.
+- Reconcile certificate consumers after every successful Certbot invocation.
+- Treat consumer convergence, not renewal alone, as lifecycle success.
 - Keep private services accessible only from the LAN.
 - Support both Ubuntu and Windows on the physical host `atreides`, developed in separate phases.
 - Keep Cloudflare credentials, private keys, issued certificates, and Certbot state outside Git.
@@ -77,6 +79,66 @@ can continue to be used while HTTPS services use:
 
 ```text
 https://atreides.lan.rirl.dev
+```
+
+## Renewal and Reconciliation Lifecycle
+
+The operational lifecycle is:
+
+```text
+SCHEDULE -> RENEW -> ACTIVATE -> VERIFY
+```
+
+For the current implementation, ACTIVATE and VERIFY are provided through a
+consumer `RECONCILE` interface.
+
+`rirl-lan-tls` owns scheduling, renewal, reconciliation invocation, and the
+aggregate lifecycle result. Consumer-specific mechanics remain outside this
+repository.
+
+The current nginx consumer contract is:
+
+```text
+exit 0     consumer convergence is proven
+nonzero    convergence could not be established
+```
+
+Reconciliation runs after every successful Certbot invocation, including runs
+where Certbot reports that no certificate is currently due for renewal. This is
+intentional because reconciliation is a correctness and recovery mechanism, not
+merely a renewal hook.
+
+### Tactical deployment assumption
+
+The current deployment assumes `rirl-lan-tls` and
+`rirl-tls-nginx-validation` are present on the same host and that the consumer
+entry point is located through a configured filesystem path:
+
+```text
+${HOME}/projects/rirl-tls-nginx-validation/scripts/reconcile.bash
+```
+
+This colocation is tactical, not strategic.
+
+```text
+STRATEGIC CONTRACT
+rirl-lan-tls -> RECONCILE interface
+
+TACTICAL CURRENT DEPLOYMENT
+same host
+known repository checkout path
+configured executable path
+```
+
+The architectural dependency is the `RECONCILE` interface and exit contract,
+not repository filesystem layout. A future installed command, package, service
+interface, remote invocation mechanism, registry, or event/fan-out mechanism
+may replace the current path without changing lifecycle semantics.
+
+See:
+
+```text
+docs/reconciliation-architecture.md
 ```
 
 ## Architecture

@@ -12,6 +12,66 @@ The workflow is based on the manually validated configuration using:
 - `certbot/dns-cloudflare:v5.7.0`
 - DNS-01 ACME validation
 - persistent Certbot state outside Git
+- a configured consumer `RECONCILE` command
+
+The operational lifecycle is:
+
+```text
+SCHEDULE -> RENEW -> ACTIVATE -> VERIFY
+```
+
+For the current implementation, ACTIVATE and VERIFY are implemented through
+consumer state reconciliation after every successful Certbot invocation.
+
+## Reconciliation Contract
+
+`rirl-lan-tls` invokes the configured consumer reconciliation command after
+Certbot completes successfully.
+
+The consumer contract is:
+
+```text
+exit 0     consumer is proven converged on the currently authoritative certificate
+nonzero    convergence could not be established
+```
+
+A successful Certbot invocation is therefore not sufficient by itself for the
+overall lifecycle to succeed.
+
+Reconciliation also runs when Certbot reports that no certificate is currently
+due for renewal. This is intentional: reconciliation is a correctness and
+recovery mechanism, not merely a renewal hook.
+
+`rirl-lan-tls` does not depend on consumer-specific details such as nginx
+commands, container names, `/healthz`, `/status`, `cert-status`, or certificate
+fingerprint implementation.
+
+## Tactical Deployment Assumption
+
+The current deployment assumes that `rirl-lan-tls` and
+`rirl-tls-nginx-validation` are present on the same host and that the consumer
+entry point is reached through a configured filesystem path:
+
+```bash
+RECONCILE_COMMAND="${HOME}/projects/rirl-tls-nginx-validation/scripts/reconcile.bash"
+```
+
+This is a tactical deployment choice, not a strategic architecture requirement.
+
+The strategic dependency is only:
+
+```text
+invoke RECONCILE
+exit 0     convergence proven
+nonzero    convergence not established
+```
+
+The current same-host repository layout and direct checkout path are simply how
+that interface is located today.
+
+Future implementations may replace this with an installed command, package,
+service interface, remote invocation mechanism, consumer registry, or
+event/fan-out mechanism without changing the lifecycle semantics.
 
 ## Security Boundary
 
@@ -47,6 +107,12 @@ Repository:
 ~/projects/rirl-lan-tls
 ```
 
+Current tactical consumer path:
+
+```text
+~/projects/rirl-tls-nginx-validation/scripts/reconcile.bash
+```
+
 ## Manual Renewal Validation
 
 Before enabling unattended renewal, run:
@@ -58,6 +124,9 @@ cd ~/projects/rirl-lan-tls
 
 The command must complete successfully.
 
+A successful dry run now includes consumer reconciliation after Certbot
+completes.
+
 Then test an ordinary renewal invocation:
 
 ```bash
@@ -65,7 +134,7 @@ Then test an ordinary renewal invocation:
 ```
 
 A successful invocation may report that no certificates are currently due for
-renewal.
+renewal. Consumer reconciliation still runs afterward.
 
 ## Install the systemd User Units
 
@@ -90,6 +159,9 @@ systemctl --user start rirl-lan-tls-renew.service
 systemctl --user status rirl-lan-tls-renew.service
 journalctl --user -u rirl-lan-tls-renew.service --since today
 ```
+
+A successful service invocation should show Certbot completion followed by
+consumer reconciliation.
 
 Do not enable the timer until the service invocation succeeds.
 
@@ -125,11 +197,25 @@ becomes available again.
 Certbot itself determines whether any certificate is sufficiently close to
 expiration to require renewal.
 
+Consumer reconciliation runs after every successful Certbot invocation,
+including successful not-due checks.
+
 ## Logs
 
 ```bash
 journalctl --user -u rirl-lan-tls-renew.service
 journalctl --user -b -u rirl-lan-tls-renew.service
+```
+
+A successful not-due run should contain messages equivalent to:
+
+```text
+Certificate not yet due for renewal
+No renewals were attempted.
+Certbot renewal completed successfully.
+Starting consumer reconciliation.
+Already converged: ... No reload performed.
+Consumer reconciliation completed successfully.
 ```
 
 ## Disable Automation
@@ -151,3 +237,12 @@ certbot/dns-cloudflare:v5.7.0
 The renewal script uses `--pull=never` and verifies that the image already
 exists locally. Image upgrades should be deliberate, dry-run tested, and
 committed as a separate controlled change.
+
+## Deferred Fan-Out
+
+Certbot deploy-hook/event-marker fan-out remains intentionally deferred.
+
+State reconciliation is the current correctness and recovery mechanism.
+
+Revisit fan-out only when concrete requirements justify it, such as multiple
+consumers, remote distribution, or asynchronous consumer activation.

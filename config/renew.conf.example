@@ -12,4 +12,7 @@ LETSENCRYPT_DIR="${HOME}/.local/share/rirl-lan-tls/letsencrypt"
 
 # Required consumer convergence interface.
 # Exit 0 = consumer is proven converged; nonzero = convergence not established.
+#
+# Tactical deployment path only: the architectural dependency is the
+# RECONCILE interface and exit contract, not repository filesystem colocation.
 RECONCILE_COMMAND="${HOME}/projects/rirl-tls-nginx-validation/scripts/reconcile.bash"
