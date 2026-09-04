@@ -22,3 +22,13 @@ The present same-host repository colocation and direct filesystem path used to
 locate `RECONCILE` are explicitly tactical deployment choices. The strategic
 contract is the reconciliation interface and its exit semantics, not the
 filesystem layout.
+
+## Reproducible scenarios
+
+- `scenarios/forced-renewal-validation.md` — deliberate end-to-end forced
+  renewal and consumer reconciliation.
+- `scenarios/systemd-timer-recovery.md` — restore and verify the user-level
+  renewal timer.
+
+Scenario documents describe how to reproduce behavior. `evidence/` preserves
+records of validation runs that were actually performed.

@@ -525,6 +525,17 @@ Future Windows work may address:
 
 The proven Ubuntu implementation should remain the reference baseline while the Windows design is developed.
 
+## Reproducible Scenarios
+
+Operational reproduction procedures are documented under:
+
+```text
+docs/scenarios/
+```
+
+These scenario documents are separate from `docs/evidence/`, which preserves
+records of completed validation runs.
+
 ## Documentation
 
 Detailed renewal automation procedures are documented in:

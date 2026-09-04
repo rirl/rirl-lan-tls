@@ -237,9 +237,11 @@ converged nginx consumer.
 
 Consumer availability is separate from renewal correctness.
 
-The current nginx validation container restart policy should be considered in a
-separate availability phase rather than folded into reconciliation semantics.
+The nginx validation consumer now uses Docker restart policy `unless-stopped`.
+Unexpected workload termination, Docker daemon restart, and host reboot recovery
+have been validated separately in `rirl-tls-nginx-validation`. That availability
+behavior remains outside the RECONCILE correctness contract.
 
-Likewise, replacing tactical filesystem colocation should be handled as a
-separate deployment/interface-hardening concern rather than mixed into the
-renewal lifecycle itself.
+Replacing tactical filesystem colocation remains a separate
+deployment/interface-hardening concern rather than part of the renewal
+lifecycle itself.
