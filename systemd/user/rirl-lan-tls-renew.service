@@ -1,0 +1,7 @@
+[Unit]
+Description=Renew rirl.dev internal TLS certificates
+Documentation=file:%h/projects/rirl-lan-tls/docs/renewal-automation.md
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/rirl-lan-tls/scripts/renew-certificates.bash

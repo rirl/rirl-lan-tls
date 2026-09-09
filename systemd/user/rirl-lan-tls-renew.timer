@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule rirl.dev internal TLS certificate renewal
+
+[Timer]
+OnCalendar=*-*-* 00,12:00:00
+RandomizedDelaySec=30m
+Persistent=true
+Unit=rirl-lan-tls-renew.service
+
+[Install]
+WantedBy=timers.target

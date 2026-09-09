@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+umask 077
+
+readonly PROGRAM_NAME="${0##*/}"
+readonly CONFIG_FILE="${HOME}/.config/rirl-lan-tls/renew.conf"
+
+CERTBOT_IMAGE='certbot/dns-cloudflare:v5.7.0'
+CLOUDFLARE_CREDENTIALS="${HOME}/.config/rirl-lan-tls/certbot/cloudflare.ini"
+LETSENCRYPT_DIR="${HOME}/.local/share/rirl-lan-tls/letsencrypt"
+
+RECONCILE_COMMAND=''
+
+if [[ -f "${CONFIG_FILE}" ]]; then
+    # shellcheck source=/dev/null
+    source "${CONFIG_FILE}"
+fi
+
+usage() {
+    cat <<USAGE
+Usage: ${PROGRAM_NAME} [--dry-run | --force-renewal]
+
+Renew certificates using the repository-approved Certbot Docker image.
+
+Options:
+  --dry-run        Perform a Certbot renewal dry run.
+  --force-renewal  Force a real production renewal even if not yet due.
+  -h, --help       Show this help.
+USAGE
+}
+
+dry_run=false
+force_renewal=false
+
+while (($# > 0)); do
+    case "$1" in
+        --dry-run)
+            dry_run=true
+            ;;
+        --force-renewal)
+            force_renewal=true
+            ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        *)
+            printf 'ERROR: unsupported argument: %s\n' "$1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+
+    shift
+done
+
+if [[ "${dry_run}" == true && "${force_renewal}" == true ]]; then
+    printf 'ERROR: --dry-run and --force-renewal are mutually exclusive.\n' >&2
+    exit 2
+fi
+
+for command in docker stat; do
+    if ! command -v "${command}" >/dev/null 2>&1; then
+        printf 'ERROR: required command not found: %s\n' "${command}" >&2
+        exit 1
+    fi
+done
+
+if [[ ! -f "${CLOUDFLARE_CREDENTIALS}" ]]; then
+    printf 'ERROR: Cloudflare credentials file not found: %s\n' \
+        "${CLOUDFLARE_CREDENTIALS}" >&2
+    exit 1
+fi
+
+credentials_mode="$(stat -c '%a' "${CLOUDFLARE_CREDENTIALS}")"
+
+if [[ "${credentials_mode}" != '600' ]]; then
+    printf 'ERROR: Cloudflare credentials must have mode 600; found %s: %s\n' \
+        "${credentials_mode}" \
+        "${CLOUDFLARE_CREDENTIALS}" >&2
+    exit 1
+fi
+
+if [[ ! -d "${LETSENCRYPT_DIR}" ]]; then
+    printf 'ERROR: Certbot state directory not found: %s\n' \
+        "${LETSENCRYPT_DIR}" >&2
+    exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+    printf 'ERROR: Docker daemon is unavailable to the current user.\n' >&2
+    exit 1
+fi
+
+if ! docker image inspect "${CERTBOT_IMAGE}" >/dev/null 2>&1; then
+    printf 'ERROR: approved Certbot image is not present locally: %s\n' \
+        "${CERTBOT_IMAGE}" >&2
+    printf 'ERROR: refusing to pull an image implicitly during renewal.\n' >&2
+    exit 1
+fi
+
+certbot_arguments=(
+    renew
+    --non-interactive
+)
+
+if [[ "${dry_run}" == true ]]; then
+    certbot_arguments+=(--dry-run)
+fi
+if [[ "${force_renewal}" == true ]]; then
+    certbot_arguments+=(--force-renewal)
+fi
+
+if [[ -z "${RECONCILE_COMMAND}" ]]; then
+    printf 'ERROR: RECONCILE_COMMAND is not configured.\n' >&2
+    exit 1
+fi
+
+if [[ ! -x "${RECONCILE_COMMAND}" ]]; then
+    printf 'ERROR: RECONCILE_COMMAND is not executable: %s\n' \
+        "${RECONCILE_COMMAND}" >&2
+    exit 1
+fi
+
+printf '[%s] Starting Certbot renewal using %s\n' \
+    "$(date --iso-8601=seconds)" \
+    "${CERTBOT_IMAGE}"
+
+docker run \
+    --rm \
+    --pull=never \
+    --mount \
+    "type=bind,src=${CLOUDFLARE_CREDENTIALS},dst=/cloudflare.ini,readonly" \
+    --mount \
+    "type=bind,src=${LETSENCRYPT_DIR},dst=/etc/letsencrypt" \
+    "${CERTBOT_IMAGE}" \
+    "${certbot_arguments[@]}"
+
+printf '[%s] Certbot renewal completed successfully.\n' \
+    "$(date --iso-8601=seconds)"
+
+printf '[%s] Starting consumer reconciliation.\n' \
+    "$(date --iso-8601=seconds)"
+
+if ! "${RECONCILE_COMMAND}"; then
+    printf '[%s] ERROR: consumer reconciliation failed.\n' \
+        "$(date --iso-8601=seconds)" >&2
+    exit 1
+fi
+
+printf '[%s] Consumer reconciliation completed successfully.\n' \
+    "$(date --iso-8601=seconds)"

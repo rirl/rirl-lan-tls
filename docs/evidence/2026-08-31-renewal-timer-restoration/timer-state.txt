@@ -1,0 +1,12 @@
+● rirl-lan-tls-renew.timer - Schedule rirl.dev internal TLS certificate renewal
+     Loaded: loaded (/home/landonr/.config/systemd/user/rirl-lan-tls-renew.timer; linked; preset: enabled)
+     Active: active (waiting) since Mon 2026-08-31 10:23:41 PDT; 1h 5min ago
+    Trigger: Mon 2026-08-31 12:26:58 PDT; 57min left
+   Triggers: ● rirl-lan-tls-renew.service
+
+Aug 31 10:23:41 atreides systemd[1353]: Started rirl-lan-tls-renew.timer - Schedule rirl.dev internal TLS certificate renewal.
+
+NEXT                         LEFT LAST                           PASSED UNIT                     ACTIVATES
+Mon 2026-08-31 12:26:58 PDT 57min Mon 2026-08-31 10:38:34 PDT 50min ago rirl-lan-tls-renew.timer rirl-lan-tls-renew.service
+
+1 timers listed.

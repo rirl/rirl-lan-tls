@@ -1,0 +1,14 @@
+Captured: 2026-08-30T16:38:48-07:00
+
+○ rirl-lan-tls-renew.timer - Schedule rirl.dev internal TLS certificate renewal
+     Loaded: loaded (/home/landonr/.config/systemd/user/rirl-lan-tls-renew.timer; linked; preset: enabled)
+     Active: inactive (dead)
+    Trigger: n/a
+   Triggers: ● rirl-lan-tls-renew.service
+
+Aug 30 04:39:30 atreides systemd[1440]: Started rirl-lan-tls-renew.timer - Schedule rirl.dev internal TLS certificate renewal.
+Aug 30 12:23:19 atreides systemd[1440]: rirl-lan-tls-renew.timer: Unit to trigger vanished.
+Aug 30 12:23:19 atreides systemd[1440]: rirl-lan-tls-renew.timer: Failed with result 'resources'.
+
+Enabled state:
+linked

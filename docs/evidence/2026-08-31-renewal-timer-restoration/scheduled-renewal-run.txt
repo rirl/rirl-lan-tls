@@ -1,0 +1,14 @@
+Aug 31 10:38:34 atreides systemd[1353]: Starting rirl-lan-tls-renew.service - Renew rirl.dev internal TLS certificates...
+Aug 31 10:38:34 atreides renew-certificates.bash[19330]: [2026-08-31T10:38:34-07:00] Starting Certbot renewal using certbot/dns-cloudflare:v5.7.0
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: Processing /etc/letsencrypt/renewal/atreides.lan.rirl.dev.conf
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: Certificate not yet due for renewal
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: The following certificates are not due for renewal yet:
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]:   /etc/letsencrypt/live/atreides.lan.rirl.dev/fullchain.pem expires on 2026-11-28 (skipped)
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: No renewals were attempted.
+Aug 31 10:38:35 atreides renew-certificates.bash[19389]: - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Aug 31 10:38:35 atreides renew-certificates.bash[19330]: [2026-08-31T10:38:35-07:00] Certbot renewal completed successfully.
+Aug 31 10:38:35 atreides systemd[1353]: Finished rirl-lan-tls-renew.service - Renew rirl.dev internal TLS certificates.

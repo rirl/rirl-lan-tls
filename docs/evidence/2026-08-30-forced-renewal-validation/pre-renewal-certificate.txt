@@ -1,0 +1,10 @@
+Captured after rotation from preserved Certbot archive generation.
+
+serial=06CE69B186C88EB17939FDBEE0F77AFC48EC
+sha256 Fingerprint=87:93:38:67:7F:36:EB:B3:C0:1D:89:94:ED:3B:4A:ED:D2:CB:93:22:74:5B:4D:91:5D:F6:92:EE:2F:CB:37:8F
+notBefore=Aug 28 15:20:37 2026 GMT
+notAfter=Nov 26 15:20:36 2026 GMT
+issuer=C = US, O = Let's Encrypt, CN = YE1
+
+Archive source:
+/home/landonr/.local/share/rirl-lan-tls/letsencrypt/archive/atreides.lan.rirl.dev/cert1.pem

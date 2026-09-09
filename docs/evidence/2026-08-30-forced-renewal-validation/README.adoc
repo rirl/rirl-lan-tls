@@ -1,0 +1,220 @@
+= Forced Let's Encrypt Renewal Validation
+:toc:
+
+== Purpose
+
+This checkpoint records one controlled end-to-end production certificate renewal validation for:
+
+----
+atreides.lan.rirl.dev
+----
+
+The objective was to prove the full rotation path:
+
+----
+new certificate issued
+-> installed
+-> nginx serving that exact certificate
+-> LAN clients trust it
+-> canary succeeds
+----
+
+== Environment
+
+Domain:: `rirl.dev`
+Internal namespace:: `lan.rirl.dev`
+Certificate hostname:: `atreides.lan.rirl.dev`
+Certificate automation repository:: `rirl-lan-tls`
+TLS validation container:: `rirl-tls-validation-nginx`
+TLS canary:: `https://atreides.lan.rirl.dev:18443/healthz`
+Certbot image:: `certbot/dns-cloudflare:v5.7.0`
+ACME validation:: Cloudflare DNS-01
+
+== Pre-renewal certificate
+
+Archive generation::
+
+----
+cert1.pem
+----
+
+Serial::
+
+----
+06CE69B186C88EB17939FDBEE0F77AFC48EC
+----
+
+SHA-256 fingerprint::
+
+----
+87:93:38:67:7F:36:EB:B3:C0:1D:89:94:ED:3B:4A:ED:D2:CB:93:22:74:5B:4D:91:5D:F6:92:EE:2F:CB:37:8F
+----
+
+Validity::
+
+----
+notBefore=Aug 28 15:20:37 2026 GMT
+notAfter=Nov 26 15:20:36 2026 GMT
+----
+
+The certificate installed in the Certbot live tree and the certificate presented by nginx matched before renewal.
+
+The trusted LAN canary returned:
+
+----
+ok
+----
+
+== Controlled production renewal
+
+The normal renewal timer was intentionally paused before the experiment.
+
+The repository-approved renewal script was extended with an explicit:
+
+----
+--force-renewal
+----
+
+option.
+
+The script continued to use the approved operational path:
+
+----
+renew-certificates.bash
+-> Docker
+-> certbot/dns-cloudflare:v5.7.0
+-> certbot renew --non-interactive --force-renewal
+----
+
+The forced production renewal completed successfully.
+
+No second forced renewal was performed.
+
+== Post-renewal certificate
+
+Archive generation::
+
+----
+cert2.pem
+----
+
+Serial::
+
+----
+0668203FC3D39CF80A3A52E1AEBBC0F38DC1
+----
+
+SHA-256 fingerprint::
+
+----
+B6:05:E4:05:1F:35:96:46:46:1C:CB:1B:30:E9:67:7E:BC:A4:72:8B:82:71:E8:90:A7:D1:D6:56:85:0F:01:D8
+----
+
+Validity::
+
+----
+notBefore=Aug 30 22:09:04 2026 GMT
+notAfter=Nov 28 22:09:03 2026 GMT
+----
+
+The Certbot live symlink advanced from `cert1.pem` to `cert2.pem`.
+
+This proves that Let's Encrypt issued a new production certificate and Certbot installed it successfully.
+
+== nginx rotation behavior
+
+Immediately after successful renewal, nginx continued to serve the old certificate.
+
+The on-disk certificate fingerprint was:
+
+----
+B6:05:E4:05:1F:35:96:46:46:1C:CB:1B:30:E9:67:7E:BC:A4:72:8B:82:71:E8:90:A7:D1:D6:56:85:0F:01:D8
+----
+
+The certificate presented by nginx was still:
+
+----
+87:93:38:67:7F:36:EB:B3:C0:1D:89:94:ED:3B:4A:ED:D2:CB:93:22:74:5B:4D:91:5D:F6:92:EE:2F:CB:37:8F
+----
+
+Therefore nginx did not automatically load the renewed certificate.
+
+The nginx configuration was validated successfully with:
+
+----
+nginx -t
+----
+
+nginx was then reloaded in place with:
+
+----
+nginx -s reload
+----
+
+After reload, nginx presented the exact newly issued certificate:
+
+----
+B6:05:E4:05:1F:35:96:46:46:1C:CB:1B:30:E9:67:7E:BC:A4:72:8B:82:71:E8:90:A7:D1:D6:56:85:0F:01:D8
+----
+
+== LAN validation
+
+Trusted canary validation from `atreides` returned:
+
+----
+ok
+----
+
+Trusted cross-host validation from `harkonnen` returned:
+
+----
+ok
+----
+
+Neither test used `curl -k` or bypassed hostname validation.
+
+== Result
+
+PASS.
+
+The controlled production certificate rotation path was successfully demonstrated:
+
+----
+Let's Encrypt production issuance
+-> Certbot installation
+-> Certbot live symlink rotation
+-> nginx reload required
+-> nginx presents exact new certificate
+-> atreides trusts certificate
+-> harkonnen trusts certificate
+-> TLS canary returns ok
+----
+
+== Operational finding
+
+Certificate renewal alone is insufficient to complete service rotation.
+
+The operational renewal workflow must include an explicit, validated nginx reload after successful certificate renewal.
+
+A future implementation should ensure that reload occurs only after successful renewal and should preserve failure visibility if reload validation fails.
+
+== Evidence files
+
+* `pre-renewal-certificate.txt`
+* `post-renewal-certificate.txt`
+* `nginx-served-after-renewal-before-reload.txt`
+* `nginx-served-after-reload.txt`
+* `atreides-canary.txt`
+* `harkonnen-canary.txt`
+* `systemd-timer-state.txt`
+
+== Follow-up
+
+The following operational items remain after this validation:
+
+* restore and verify the systemd renewal timer;
+* define the nginx reload hook or equivalent post-renewal action;
+* consider automatic startup/restart policy for `rirl-tls-validation-nginx`;
+* add structured renewal history;
+* add regression tests;
+* add certificate-health status and future observability integration.

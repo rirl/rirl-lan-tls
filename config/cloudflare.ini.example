@@ -1,0 +1,11 @@
+# Copy this file OUTSIDE the repository to:
+#
+#   ~/.config/rirl-lan-tls/certbot/cloudflare.ini
+#
+# Then:
+#
+#   chmod 600 ~/.config/rirl-lan-tls/certbot/cloudflare.ini
+#
+# Never commit the populated file.
+
+dns_cloudflare_api_token = REPLACE_WITH_SCOPED_CLOUDFLARE_API_TOKEN

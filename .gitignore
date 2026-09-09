@@ -23,3 +23,6 @@ acme-state/
 Thumbs.db
 .vscode/
 .idea/
+
+# Generated test reports
+test-results/
